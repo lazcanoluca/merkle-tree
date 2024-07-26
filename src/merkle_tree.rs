@@ -1,10 +1,16 @@
 use hmac_sha256::Hash;
 
-pub struct MerkleTree {}
+pub struct MerkleTree {
+    pub root: Option<[u8; 32]>,
+    pub leafs: Vec<[u8; 32]>,
+}
 
 impl Default for MerkleTree {
     fn default() -> Self {
-        Self {}
+        Self {
+            root: None,
+            leafs: Vec::new(),
+        }
     }
 }
 
@@ -12,7 +18,7 @@ impl Default for MerkleTree {
 // TODO: type Level for Vec<[u8; 32]> of even length (duplicates last element if odd)
 
 impl MerkleTree {
-    /// Create a new MerkleTree instance.
+    /// Create a new empty MerkleTree instance.
     pub fn new() -> Self {
         Self::default()
     }
