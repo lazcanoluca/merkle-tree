@@ -44,6 +44,17 @@ impl MerkleTree {
             .collect()
     }
 
+    /// Computes the Merkle root hash for the provided leaf hashes.
+    fn merkle_root(&self, leafs: Vec<[u8; 32]>) -> [u8; 32] {
+        let mut level = leafs;
+
+        while level.len() > 1 {
+            level = self.merkle_parent_level(level);
+        }
+
+        level[0]
+    }
+
     /// Hash the provided bytes using SHA-256.
     /// Returns the hash as a 32 bytes array.
     fn hash(&self, bytes: &[u8]) -> [u8; 32] {
@@ -154,6 +165,45 @@ mod tests {
             merkle_tree
                 .merkle_parent(&hashes.clone()[4], &hashes.clone()[4])
                 .to_vec()
+        );
+    }
+
+    #[test]
+    fn test_merkle_root_should_return_root_hash_one_level() {
+        let merkle_tree = MerkleTree::new();
+
+        let hashes = vec![
+            merkle_tree.hash("The Road goes ever on and on,".as_bytes()),
+            merkle_tree.hash("Down from the door where it began.".as_bytes()),
+        ];
+
+        let root_hash = merkle_tree.merkle_root(hashes.clone());
+
+        assert_eq!(
+            root_hash.to_vec(),
+            merkle_tree.merkle_parent(&hashes.clone()[0], &hashes.clone()[1])
+        );
+    }
+
+    #[test]
+    fn test_merkle_root_should_return_root_hash_two_levels() {
+        let merkle_tree = MerkleTree::new();
+
+        let hashes = vec![
+            merkle_tree.hash("One Ring to rule them all, One Ring to find them,".as_bytes()),
+            merkle_tree
+                .hash("One Ring to bring them all and in the darkness bind them.".as_bytes()),
+            merkle_tree.hash("In the Land of Mordor where the Shadows lie.".as_bytes()),
+        ];
+
+        let root_hash = merkle_tree.merkle_root(hashes.clone());
+
+        assert_eq!(
+            root_hash.to_vec(),
+            merkle_tree.merkle_parent(
+                &merkle_tree.merkle_parent(&hashes.clone()[0], &hashes.clone()[1]),
+                &merkle_tree.merkle_parent(&hashes.clone()[2], &hashes.clone()[2]),
+            )
         );
     }
 }
