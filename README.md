@@ -4,9 +4,13 @@ This project is a Rust implementation of a Merkle Tree.
 
 ## Usage
 
+## Tests
+
+Just clone and `cargo test`.
+
 ## Features
 
-- [ ] A Merkle Tree can be built out of an array.
+- [x] A Merkle Tree can be built out of an array.
 
 - [ ] A Merkle Tree can generate a proof that it contains an element.
 
