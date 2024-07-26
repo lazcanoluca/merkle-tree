@@ -25,8 +25,14 @@ impl MerkleTree {
 
     /// Create a new MerkleTree from the provided items.
     /// Each item should be representable as bytes.
+    /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
     pub fn build<T: AsRef<[u8]>>(&self, items: &[T]) -> Self {
-        todo!()
+        let leafs: Vec<[u8; 32]> = items.iter().map(|item| self.hash(item.as_ref())).collect();
+
+        Self {
+            root: Some(self.merkle_root(leafs.clone())),
+            leafs,
+        }
     }
 
     /// Computes the parent hash for the concatenation of the provided left and right hashes.
