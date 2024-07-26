@@ -8,6 +8,9 @@ impl Default for MerkleTree {
     }
 }
 
+// TODO: type Hash for [u8; 32]
+// TODO: type Level for Vec<[u8; 32]> of even length (duplicates last element if odd)
+
 impl MerkleTree {
     /// Create a new MerkleTree instance.
     pub fn new() -> Self {
@@ -20,11 +23,25 @@ impl MerkleTree {
         todo!()
     }
 
-    /// Compute the parent hash for the provided left and right hashes.
+    /// Computes the parent hash for the concatenation of the provided left and right hashes.
     fn merkle_parent(&self, left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
         let concat = [left.as_slice(), right.as_slice()].concat();
 
         self.hash(&concat)
+    }
+
+    /// Creates the parent level for the given level.
+    /// If the level has an odd number of hashes, the last hash is duplicated.
+    fn merkle_parent_level(&self, mut level: Vec<[u8; 32]>) -> Vec<[u8; 32]> {
+        // If the number of leafs is odd, duplicate the last leaf.
+        if level.len() % 2 == 1 {
+            level.extend(level.last().cloned())
+        }
+
+        level
+            .chunks_exact(2)
+            .map(|chunk| self.merkle_parent(&chunk[0], &chunk[1]))
+            .collect()
     }
 
     /// Hash the provided bytes using SHA-256.
@@ -74,6 +91,69 @@ mod tests {
             parent_hash.to_vec(),
             hex::decode("e7dbb63c6671bdf7581e418da8feee175e86adc84adc8e123a30407dd8e730f3")
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_even_length_level_should_return_parent_level() {
+        let merkle_tree = MerkleTree::new();
+
+        let hashes = vec![
+            merkle_tree.hash("Home is behind, the world ahead,".as_bytes()),
+            merkle_tree.hash("and there are many paths to tread".as_bytes()),
+            merkle_tree.hash("through shadows to the edge of night,".as_bytes()),
+            merkle_tree.hash("until the stars are all alight.".as_bytes()),
+        ];
+
+        let parent_level = merkle_tree.merkle_parent_level(hashes.clone());
+
+        assert_eq!(parent_level.len(), 2);
+        assert_eq!(
+            parent_level[0].to_vec(),
+            merkle_tree
+                .merkle_parent(&hashes.clone()[0], &hashes.clone()[1])
+                .to_vec()
+        );
+        assert_eq!(
+            parent_level[1].to_vec(),
+            merkle_tree
+                .merkle_parent(&hashes.clone()[2], &hashes.clone()[3])
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn test_odd_length_level_should_return_parent_level() {
+        let merkle_tree = MerkleTree::new();
+
+        let hashes = vec![
+            merkle_tree.hash("One ring to rule them all,".as_bytes()),
+            merkle_tree.hash("One ring to find them,".as_bytes()),
+            merkle_tree.hash("One ring to bring them all,".as_bytes()),
+            merkle_tree.hash("and in the darkness bind them.".as_bytes()),
+            merkle_tree.hash("In the Land of Mordor where the Shadows lie.".as_bytes()),
+        ];
+
+        let parent_level = merkle_tree.merkle_parent_level(hashes.clone());
+
+        assert_eq!(parent_level.len(), 3);
+        assert_eq!(
+            parent_level[0].to_vec(),
+            merkle_tree
+                .merkle_parent(&hashes.clone()[0], &hashes.clone()[1])
+                .to_vec()
+        );
+        assert_eq!(
+            parent_level[1].to_vec(),
+            merkle_tree
+                .merkle_parent(&hashes.clone()[2], &hashes.clone()[3])
+                .to_vec()
+        );
+        assert_eq!(
+            parent_level[2].to_vec(),
+            merkle_tree
+                .merkle_parent(&hashes.clone()[4], &hashes.clone()[4])
+                .to_vec()
         );
     }
 }
