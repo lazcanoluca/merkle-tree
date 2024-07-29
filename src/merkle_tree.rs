@@ -18,6 +18,10 @@ impl MerkleTree {
     /// Each item should be representable as bytes.
     /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
     pub fn build<T: AsRef<[u8]>>(items: &[T]) -> Self {
+        if items.is_empty() {
+            return Self::new();
+        }
+
         let leaves: Vec<[u8; 32]> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
 
         Self {
@@ -191,5 +195,12 @@ mod tests {
                 &MerkleTree::merkle_parent(&hashes.clone()[2], &hashes.clone()[2]),
             )
         );
+    }
+
+    #[test]
+    fn test_build_with_no_items_creates_empty_tree() {
+        let tree = MerkleTree::build(Vec::<&[u8]>::new().as_slice());
+        assert_eq!(tree.root, None);
+        assert_eq!(tree.leaves.len(), 0);
     }
 }
