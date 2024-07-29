@@ -14,9 +14,6 @@ impl Default for MerkleTree {
     }
 }
 
-// TODO: type Hash for [u8; 32]
-// TODO: type Level for Vec<[u8; 32]> of even length (duplicates last element if odd)
-
 impl MerkleTree {
     /// Create a new empty MerkleTree instance.
     pub fn new() -> Self {
