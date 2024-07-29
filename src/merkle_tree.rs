@@ -5,19 +5,13 @@ pub struct MerkleTree {
     pub leaves: Vec<[u8; 32]>,
 }
 
-impl Default for MerkleTree {
-    fn default() -> Self {
+impl MerkleTree {
+    /// Create a new empty MerkleTree instance.
+    pub fn new() -> Self {
         Self {
             root: None,
             leaves: Vec::new(),
         }
-    }
-}
-
-impl MerkleTree {
-    /// Create a new empty MerkleTree instance.
-    pub fn new() -> Self {
-        Self::default()
     }
 
     /// Create a new MerkleTree from the provided items.
