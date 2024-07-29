@@ -2,14 +2,14 @@ use hmac_sha256::Hash;
 
 pub struct MerkleTree {
     pub root: Option<[u8; 32]>,
-    pub leafs: Vec<[u8; 32]>,
+    pub leaves: Vec<[u8; 32]>,
 }
 
 impl Default for MerkleTree {
     fn default() -> Self {
         Self {
             root: None,
-            leafs: Vec::new(),
+            leaves: Vec::new(),
         }
     }
 }
@@ -27,11 +27,11 @@ impl MerkleTree {
     /// Each item should be representable as bytes.
     /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
     pub fn build<T: AsRef<[u8]>>(&self, items: &[T]) -> Self {
-        let leafs: Vec<[u8; 32]> = items.iter().map(|item| self.hash(item.as_ref())).collect();
+        let leaves: Vec<[u8; 32]> = items.iter().map(|item| self.hash(item.as_ref())).collect();
 
         Self {
-            root: Some(self.merkle_root(leafs.clone())),
-            leafs,
+            root: Some(self.merkle_root(leaves.clone())),
+            leaves,
         }
     }
 
