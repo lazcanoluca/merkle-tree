@@ -35,10 +35,7 @@ impl MerkleTree {
             level.extend(level.last().cloned())
         }
 
-        level
-            .chunks_exact(2)
-            .map(|chunk| Self::merkle_parent(chunk))
-            .collect()
+        level.chunks_exact(2).map(Self::merkle_parent).collect()
     }
 
     /// Computes the Merkle root hash for the provided leaf hashes.
