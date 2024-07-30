@@ -30,11 +30,9 @@ impl MerkleTree {
         }
     }
 
-    /// Computes the parent hash for the concatenation of the provided left and right hashes.
-    fn merkle_parent(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
-        let concat = [left.as_slice(), right.as_slice()].concat();
-
-        Self::hash(&concat)
+    /// Computes the parent hash for the concatenation of the children hashes.
+    fn merkle_parent(children: &[[u8; 32]]) -> [u8; 32] {
+        Self::hash(children.as_flattened())
     }
 
     /// Creates the parent level for the given level.
@@ -47,7 +45,7 @@ impl MerkleTree {
 
         level
             .chunks_exact(2)
-            .map(|chunk| Self::merkle_parent(&chunk[0], &chunk[1]))
+            .map(|chunk| Self::merkle_parent(chunk))
             .collect()
     }
 
@@ -104,7 +102,7 @@ mod tests {
                 .unwrap()
         );
 
-        let parent_hash = MerkleTree::merkle_parent(&left_hash, &right_hash);
+        let parent_hash = MerkleTree::merkle_parent(&[left_hash, right_hash]);
         assert_eq!(
             parent_hash.to_vec(),
             hex::decode("e7dbb63c6671bdf7581e418da8feee175e86adc84adc8e123a30407dd8e730f3")
@@ -126,11 +124,11 @@ mod tests {
         assert_eq!(parent_level.len(), 2);
         assert_eq!(
             parent_level[0].to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[0], &hashes.clone()[1]).to_vec()
+            MerkleTree::merkle_parent(&[hashes[0], hashes[1]]).to_vec()
         );
         assert_eq!(
             parent_level[1].to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[2], &hashes.clone()[3]).to_vec()
+            MerkleTree::merkle_parent(&[hashes[2], hashes[3]]).to_vec()
         );
     }
 
@@ -149,15 +147,15 @@ mod tests {
         assert_eq!(parent_level.len(), 3);
         assert_eq!(
             parent_level[0].to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[0], &hashes.clone()[1]).to_vec()
+            MerkleTree::merkle_parent(&[hashes[0], hashes[1]]).to_vec()
         );
         assert_eq!(
             parent_level[1].to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[2], &hashes.clone()[3]).to_vec()
+            MerkleTree::merkle_parent(&[hashes[2], hashes[3]]).to_vec()
         );
         assert_eq!(
             parent_level[2].to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[4], &hashes.clone()[4]).to_vec()
+            MerkleTree::merkle_parent(&[hashes[4], hashes[4]]).to_vec()
         );
     }
 
@@ -170,10 +168,7 @@ mod tests {
 
         let root_hash = MerkleTree::merkle_root(hashes.clone());
 
-        assert_eq!(
-            root_hash.to_vec(),
-            MerkleTree::merkle_parent(&hashes.clone()[0], &hashes.clone()[1])
-        );
+        assert_eq!(root_hash.to_vec(), MerkleTree::merkle_parent(&hashes));
     }
 
     #[test]
@@ -190,10 +185,10 @@ mod tests {
 
         assert_eq!(
             root_hash.to_vec(),
-            MerkleTree::merkle_parent(
-                &MerkleTree::merkle_parent(&hashes.clone()[0], &hashes.clone()[1]),
-                &MerkleTree::merkle_parent(&hashes.clone()[2], &hashes.clone()[2]),
-            )
+            MerkleTree::merkle_parent(&[
+                MerkleTree::merkle_parent(&[hashes[0], hashes[1]]),
+                MerkleTree::merkle_parent(&[hashes[2], hashes[2]])
+            ])
         );
     }
 
