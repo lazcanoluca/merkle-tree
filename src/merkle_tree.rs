@@ -6,14 +6,6 @@ pub struct MerkleTree {
 }
 
 impl MerkleTree {
-    /// Create a new empty MerkleTree instance.
-    pub fn new() -> Self {
-        Self {
-            root: None,
-            leaves: Vec::new(),
-        }
-    }
-
     /// Create a new MerkleTree from the provided items.
     /// Each item should be representable as bytes.
     /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
