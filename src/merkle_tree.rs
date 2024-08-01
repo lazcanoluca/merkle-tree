@@ -33,7 +33,9 @@ impl MerkleTree {
 
     /// Computes the parent hash for the concatenation of the children hashes.
     fn merkle_parent(children: &[[u8; 32]]) -> [u8; 32] {
-        Self::hash(children.as_flattened())
+        let mut children_vector = children.to_vec();
+        children_vector.sort();
+        Self::hash(children_vector.as_flattened())
     }
 
     /// Creates the parent level for the given level.
