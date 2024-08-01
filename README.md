@@ -14,6 +14,8 @@ Just clone and `cargo test`.
 
 - [x] A Merkle Tree can generate a proof that it contains an element.
 
+- [x] A Merkle Tree can validate that the proof for a given hash is correct.
+
 - [ ] A Merkle Tree can verify that a given hash is contained in it.
 
 - [ ] A Merke Tree can be dynamic, this means that elements can be added once it is built.
