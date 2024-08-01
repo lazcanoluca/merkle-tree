@@ -69,6 +69,42 @@ impl MerkleTree {
     fn hash(bytes: &[u8]) -> [u8; 32] {
         Hash::hash(bytes)
     }
+
+    // Returns tuple (level, index, hash).
+    fn get_parent(&self, level: usize, index: usize) -> Option<(usize, usize, [u8; 32])> {
+        let parent_index = index / 2;
+        let parent_level = level + 1;
+        let parent = self.levels.get(parent_level)?.get(parent_index)?.clone();
+
+        Some((parent_level, parent_index, parent))
+    }
+
+    fn get_sibling(&self, level: usize, index: usize) -> Option<(usize, usize, [u8; 32])> {
+        let sibling_index = if index % 2 == 1 { index - 1 } else { index + 1 };
+
+        let sibling = self.levels.get(level)?.get(sibling_index)?.clone();
+
+        Some((level, sibling_index, sibling))
+    }
+
+    pub fn proof_of_inclusion(&self, hash: &[u8; 32]) -> Option<Vec<[u8; 32]>> {
+        let index = self.levels.get(0)?.iter().position(|&h| h == *hash)?;
+
+        let mut current = (0, index, hash.clone());
+
+        let mut proof: Vec<[u8; 32]> = Vec::new();
+
+        while let Some(parent) = self.get_parent(current.0, current.1) {
+            let sibling_or_duplicated_hash = self
+                .get_sibling(current.0, current.1)
+                .or(Some(current))
+                .unwrap();
+            proof.push(sibling_or_duplicated_hash.2);
+            current = parent;
+        }
+
+        Some(proof)
+    }
 }
 
 #[cfg(test)]
@@ -253,5 +289,46 @@ mod tests {
     fn test_build_with_no_items_returns_none() {
         let tree = MerkleTree::build(Vec::<&[u8]>::new().as_slice());
         assert!(tree.is_none());
+    }
+
+    #[test]
+    fn test_proof_of_inclusion_non_existant_hash() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let non_existant_hash = MerkleTree::hash("Fly, you fools!".as_bytes());
+
+        let proof = tree.proof_of_inclusion(&non_existant_hash);
+
+        assert!(proof.is_none());
+    }
+
+    #[test]
+    fn test_proof_of_inclusion() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[2].as_bytes());
+
+        let proof = tree.proof_of_inclusion(&hash).unwrap();
+
+        assert_eq!(proof.len(), 3);
+        assert_eq!(proof[0].to_vec(), tree.levels[0][3].to_vec());
+        assert_eq!(proof[1].to_vec(), tree.levels[1][0].to_vec());
+        assert_eq!(proof[2].to_vec(), tree.levels[2][1].to_vec());
     }
 }
