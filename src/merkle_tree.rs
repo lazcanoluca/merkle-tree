@@ -15,7 +15,15 @@ pub struct MerkleTree {
 impl MerkleTree {
     /// Create a new MerkleTree from the provided items.
     /// Each item should be representable as bytes.
-    /// It returns a `MerkleTree` instance.
+    /// The creation will fail if the items list is empty.
+    ///
+    /// # Examples
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let items = vec!["In a hole in the ground", "there lived a hobbit."];
+    /// let merkle_tree = MerkleTree::build(&items).unwrap();
+    /// ```
     pub fn build<T: AsRef<[u8]>>(items: &[T]) -> Option<Self> {
         if items.is_empty() {
             return None;
@@ -28,6 +36,17 @@ impl MerkleTree {
         Some(Self { levels })
     }
 
+    /// Insert a new item into the Merkle tree.
+    /// The tree will be updated to include the new item's hash.
+    ///
+    /// # Examples
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    /// let items = vec!["In a hole in the ground", "there lived a hobbit."];
+    /// let mut merkle_tree = MerkleTree::build(&items).unwrap();
+    ///
+    /// merkle_tree.insert(&"Gandalf the Grey");
+    /// ```
     pub fn insert<T: AsRef<[u8]>>(&mut self, item: &T) {
         let mut leaves = self.levels[0].clone();
         leaves.push(Self::hash(item.as_ref()));
@@ -92,6 +111,14 @@ impl MerkleTree {
 
     /// Hash the provided bytes using SHA-256.
     /// Returns the hash as a 32 bytes array.
+    ///
+    /// # Examples
+    /// ```
+    /// use merkle_tree::MerkleTree;
+    ///
+    /// let input = "In a hole in the ground there lived a hobbit.";
+    /// let hash = MerkleTree::hash(input.as_bytes());
+    /// ```
     pub fn hash(bytes: &[u8]) -> Hash {
         hmac_sha256::Hash::hash(bytes)
     }
