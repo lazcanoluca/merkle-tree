@@ -1,7 +1,9 @@
-use hmac_sha256::Hash;
+use hmac_sha256;
+
+type Hash = [u8; 32];
 
 pub struct MerkleTree {
-    levels: Vec<Vec<[u8; 32]>>,
+    levels: Vec<Vec<Hash>>,
 }
 
 impl MerkleTree {
@@ -17,7 +19,7 @@ impl MerkleTree {
 
         let mut levels = Vec::with_capacity(total_height + 1);
 
-        let leaves: Vec<[u8; 32]> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
+        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
         levels.push(leaves);
 
         while let Some(level) = Self::merkle_parent_level(levels.last().unwrap()) {
@@ -32,7 +34,7 @@ impl MerkleTree {
     }
 
     /// Computes the parent hash for the concatenation of the children hashes.
-    fn merkle_parent(children: &[[u8; 32]]) -> [u8; 32] {
+    fn merkle_parent(children: &[Hash]) -> Hash {
         let mut children_vector = children.to_vec();
         children_vector.sort();
         Self::hash(children_vector.as_flattened())
@@ -40,7 +42,7 @@ impl MerkleTree {
 
     /// Creates the parent level for the given level.
     /// If the level has an odd number of hashes, the last hash is duplicated.
-    fn merkle_parent_level(level: &Vec<[u8; 32]>) -> Option<Vec<[u8; 32]>> {
+    fn merkle_parent_level(level: &Vec<Hash>) -> Option<Vec<Hash>> {
         // Is root, return None.
         if level.len() == 1 {
             return None;
@@ -62,18 +64,18 @@ impl MerkleTree {
     }
 
     /// Computes the Merkle root hash for the provided leaf hashes.
-    pub fn root(&self) -> [u8; 32] {
+    pub fn root(&self) -> Hash {
         self.levels.last().unwrap().first().unwrap().clone()
     }
 
     /// Hash the provided bytes using SHA-256.
     /// Returns the hash as a 32 bytes array.
-    fn hash(bytes: &[u8]) -> [u8; 32] {
-        Hash::hash(bytes)
+    fn hash(bytes: &[u8]) -> Hash {
+        hmac_sha256::Hash::hash(bytes)
     }
 
     // Returns tuple (level, index, hash).
-    fn get_parent(&self, level: usize, index: usize) -> Option<(usize, usize, [u8; 32])> {
+    fn get_parent(&self, level: usize, index: usize) -> Option<(usize, usize, Hash)> {
         let parent_index = index / 2;
         let parent_level = level + 1;
         let parent = self.levels.get(parent_level)?.get(parent_index)?.clone();
@@ -81,7 +83,7 @@ impl MerkleTree {
         Some((parent_level, parent_index, parent))
     }
 
-    fn get_sibling(&self, level: usize, index: usize) -> Option<(usize, usize, [u8; 32])> {
+    fn get_sibling(&self, level: usize, index: usize) -> Option<(usize, usize, Hash)> {
         let sibling_index = if index % 2 == 1 { index - 1 } else { index + 1 };
 
         let sibling = self.levels.get(level)?.get(sibling_index)?.clone();
@@ -89,12 +91,12 @@ impl MerkleTree {
         Some((level, sibling_index, sibling))
     }
 
-    pub fn proof_of_inclusion(&self, hash: &[u8; 32]) -> Option<Vec<[u8; 32]>> {
+    pub fn proof_of_inclusion(&self, hash: &Hash) -> Option<Vec<Hash>> {
         let index = self.levels.get(0)?.iter().position(|&h| h == *hash)?;
 
         let mut current = (0, index, hash.clone());
 
-        let mut proof: Vec<[u8; 32]> = Vec::new();
+        let mut proof: Vec<Hash> = Vec::new();
 
         while let Some(parent) = self.get_parent(current.0, current.1) {
             let sibling_or_duplicated_hash = self
@@ -108,7 +110,7 @@ impl MerkleTree {
         Some(proof)
     }
 
-    pub fn validate_proof(&self, hash: &[u8; 32], proof: &[[u8; 32]]) -> bool {
+    pub fn validate_proof(&self, hash: &Hash, proof: &[Hash]) -> bool {
         let validation_root = proof.iter().fold(hash.clone(), |hash, sibling| {
             Self::merkle_parent(&[hash, *sibling])
         });
@@ -116,7 +118,7 @@ impl MerkleTree {
         validation_root == self.root()
     }
 
-    pub fn contains_hash(&self, hash: &[u8; 32]) -> bool {
+    pub fn contains_hash(&self, hash: &Hash) -> bool {
         self.levels[0].iter().any(|h| h == hash)
     }
 }
