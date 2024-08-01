@@ -15,24 +15,40 @@ pub struct MerkleTree {
 impl MerkleTree {
     /// Create a new MerkleTree from the provided items.
     /// Each item should be representable as bytes.
-    /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
+    /// It returns a `MerkleTree` instance.
     pub fn build<T: AsRef<[u8]>>(items: &[T]) -> Option<Self> {
         if items.is_empty() {
             return None;
         }
 
-        let total_height = Self::tree_height(items.len());
+        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
+
+        let levels = Self::construct_levels(leaves);
+
+        Some(Self { levels })
+    }
+
+    pub fn insert<T: AsRef<[u8]>>(&mut self, item: &T) {
+        let mut leaves = self.levels[0].clone();
+        leaves.push(Self::hash(item.as_ref()));
+
+        let levels = Self::construct_levels(leaves);
+
+        self.levels = levels;
+    }
+
+    fn construct_levels(leaves: Vec<Hash>) -> Vec<Vec<Hash>> {
+        let total_height = Self::tree_height(leaves.len());
 
         let mut levels = Vec::with_capacity(total_height + 1);
 
-        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
         levels.push(leaves);
 
         while let Some(level) = Self::merkle_parent_level(levels.last().unwrap()) {
             levels.push(level);
         }
 
-        Some(Self { levels })
+        levels
     }
 
     fn tree_height(items: usize) -> usize {
@@ -437,5 +453,37 @@ mod tests {
         let hash = MerkleTree::hash(items[1].as_bytes());
 
         assert!(tree.contains_hash(&hash));
+    }
+
+    #[test]
+    fn test_add_an_element() {
+        let items = vec![
+            "Learn now the lore of Living Creatures!",
+            "First name the four, the free peoples:",
+            "Eldest of all, the elf-children;",
+            "Dwarf the delver, dark are his houses;",
+            "Ent the earthborn, old as mountains;",
+        ];
+
+        let mut tree = MerkleTree::build(&items).unwrap();
+
+        assert_eq!(tree.levels[0].len(), 5);
+
+        tree.insert(&"Man the mortal, master of horses:");
+
+        assert_eq!(tree.levels[0].len(), 6);
+
+        let items_complete = vec![
+            "Learn now the lore of Living Creatures!",
+            "First name the four, the free peoples:",
+            "Eldest of all, the elf-children;",
+            "Dwarf the delver, dark are his houses;",
+            "Ent the earthborn, old as mountains;",
+            "Man the mortal, master of horses:",
+        ];
+
+        let tree_complete = MerkleTree::build(&items_complete).unwrap();
+
+        assert_eq!(tree.root().to_vec(), tree_complete.root().to_vec());
     }
 }
