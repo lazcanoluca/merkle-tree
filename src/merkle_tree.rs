@@ -21,18 +21,25 @@ impl MerkleTree {
             return None;
         }
 
-        let total_height = Self::tree_height(items.len());
+        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
+
+        let levels = Self::construct_levels(leaves);
+
+        Some(Self { levels })
+    }
+
+    fn construct_levels(leaves: Vec<Hash>) -> Vec<Vec<Hash>> {
+        let total_height = Self::tree_height(leaves.len());
 
         let mut levels = Vec::with_capacity(total_height + 1);
 
-        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
         levels.push(leaves);
 
         while let Some(level) = Self::merkle_parent_level(levels.last().unwrap()) {
             levels.push(level);
         }
 
-        Some(Self { levels })
+        levels
     }
 
     fn tree_height(items: usize) -> usize {
