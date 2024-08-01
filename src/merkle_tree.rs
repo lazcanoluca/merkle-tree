@@ -105,6 +105,14 @@ impl MerkleTree {
 
         Some(proof)
     }
+
+    pub fn validate_proof(&self, hash: &[u8; 32], proof: &[[u8; 32]]) -> bool {
+        let validation_root = proof.iter().fold(hash.clone(), |hash, sibling| {
+            Self::merkle_parent(&[hash, *sibling])
+        });
+
+        validation_root == self.root()
+    }
 }
 
 #[cfg(test)]
@@ -330,5 +338,53 @@ mod tests {
         assert_eq!(proof[0].to_vec(), tree.levels[0][3].to_vec());
         assert_eq!(proof[1].to_vec(), tree.levels[1][0].to_vec());
         assert_eq!(proof[2].to_vec(), tree.levels[2][1].to_vec());
+    }
+
+    #[test]
+    fn test_validate_wrong_proof() {
+        let corrupted_items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "LONG LIVE SAURON ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let corrupt_tree = MerkleTree::build(&corrupted_items).unwrap();
+        let corrupt_element_hash = corrupt_tree.levels[0][2];
+        let wrong_proof = corrupt_tree
+            .proof_of_inclusion(&corrupt_element_hash)
+            .unwrap();
+
+        let correct_items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let correct_tree = MerkleTree::build(&correct_items).unwrap();
+
+        assert!(!correct_tree.validate_proof(&corrupt_element_hash, &wrong_proof));
+    }
+
+    #[test]
+    fn test_validate_correct_proof() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[2].as_bytes());
+
+        let proof = tree.proof_of_inclusion(&hash).unwrap();
+
+        assert!(tree.validate_proof(&hash, &proof));
     }
 }
