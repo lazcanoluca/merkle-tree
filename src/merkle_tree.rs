@@ -115,6 +115,10 @@ impl MerkleTree {
 
         validation_root == self.root()
     }
+
+    pub fn contains_hash(&self, hash: &[u8; 32]) -> bool {
+        self.levels[0].iter().any(|h| h == hash)
+    }
 }
 
 #[cfg(test)]
@@ -388,5 +392,33 @@ mod tests {
         let proof = tree.proof_of_inclusion(&hash).unwrap();
 
         assert!(tree.validate_proof(&hash, &proof));
+    }
+
+    #[test]
+    fn test_hash_not_included_returns_false() {
+        let items = vec![
+            "Home is behind, the world ahead, ",
+            "and there are many paths to tread.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash("Fly, you fools!".as_bytes());
+
+        assert!(!tree.contains_hash(&hash));
+    }
+
+    #[test]
+    fn test_hash_included_returns_true() {
+        let items = vec![
+            "Home is behind, the world ahead, ",
+            "and there are many paths to tread.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[1].as_bytes());
+
+        assert!(tree.contains_hash(&hash));
     }
 }
