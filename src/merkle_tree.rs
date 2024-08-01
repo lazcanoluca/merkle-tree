@@ -2,6 +2,12 @@ use hmac_sha256;
 
 type Hash = [u8; 32];
 
+struct TreePosition {
+    level: usize,
+    index: usize,
+    hash: Hash,
+}
+
 pub struct MerkleTree {
     levels: Vec<Vec<Hash>>,
 }
@@ -75,35 +81,44 @@ impl MerkleTree {
     }
 
     // Returns tuple (level, index, hash).
-    fn get_parent(&self, level: usize, index: usize) -> Option<(usize, usize, Hash)> {
+    fn get_parent(&self, level: usize, index: usize) -> Option<TreePosition> {
         let parent_index = index / 2;
         let parent_level = level + 1;
         let parent = self.levels.get(parent_level)?.get(parent_index)?.clone();
 
-        Some((parent_level, parent_index, parent))
+        Some(TreePosition {
+            level: parent_level,
+            index: parent_index,
+            hash: parent,
+        })
     }
 
-    fn get_sibling(&self, level: usize, index: usize) -> Option<(usize, usize, Hash)> {
+    fn get_sibling(&self, level: usize, index: usize) -> Option<TreePosition> {
         let sibling_index = if index % 2 == 1 { index - 1 } else { index + 1 };
 
         let sibling = self.levels.get(level)?.get(sibling_index)?.clone();
 
-        Some((level, sibling_index, sibling))
+        Some(TreePosition {
+            level: level,
+            index: sibling_index,
+            hash: sibling,
+        })
     }
 
     pub fn proof_of_inclusion(&self, hash: &Hash) -> Option<Vec<Hash>> {
         let index = self.levels.get(0)?.iter().position(|&h| h == *hash)?;
 
-        let mut current = (0, index, hash.clone());
+        let mut current = TreePosition {
+            level: 0,
+            index,
+            hash: hash.clone(),
+        };
 
         let mut proof: Vec<Hash> = Vec::new();
 
-        while let Some(parent) = self.get_parent(current.0, current.1) {
-            let sibling_or_duplicated_hash = self
-                .get_sibling(current.0, current.1)
-                .or(Some(current))
-                .unwrap();
-            proof.push(sibling_or_duplicated_hash.2);
+        while let Some(parent) = self.get_parent(current.level, current.index) {
+            let sibling = self.get_sibling(current.level, current.index);
+            proof.push(sibling.or(Some(current)).unwrap().hash);
             current = parent;
         }
 
