@@ -1,8 +1,15 @@
-use hmac_sha256::Hash;
+use hmac_sha256;
+
+type Hash = [u8; 32];
+
+struct TreePosition {
+    level: usize,
+    index: usize,
+    hash: Hash,
+}
 
 pub struct MerkleTree {
-    pub root: Option<[u8; 32]>,
-    pub leaves: Vec<[u8; 32]>,
+    levels: Vec<Vec<Hash>>,
 }
 
 impl MerkleTree {
@@ -14,45 +21,120 @@ impl MerkleTree {
             return None;
         }
 
-        let leaves: Vec<[u8; 32]> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
+        let total_height = Self::tree_height(items.len());
 
-        Some(Self {
-            root: Some(Self::merkle_root(leaves.clone())),
-            leaves,
-        })
+        let mut levels = Vec::with_capacity(total_height + 1);
+
+        let leaves: Vec<Hash> = items.iter().map(|item| Self::hash(item.as_ref())).collect();
+        levels.push(leaves);
+
+        while let Some(level) = Self::merkle_parent_level(levels.last().unwrap()) {
+            levels.push(level);
+        }
+
+        Some(Self { levels })
+    }
+
+    fn tree_height(items: usize) -> usize {
+        (items as f64).log2().ceil() as usize
     }
 
     /// Computes the parent hash for the concatenation of the children hashes.
-    fn merkle_parent(children: &[[u8; 32]]) -> [u8; 32] {
-        Self::hash(children.as_flattened())
+    fn merkle_parent(children: &[Hash]) -> Hash {
+        let mut children_vector = children.to_vec();
+        children_vector.sort();
+        Self::hash(children_vector.as_flattened())
     }
 
     /// Creates the parent level for the given level.
     /// If the level has an odd number of hashes, the last hash is duplicated.
-    fn merkle_parent_level(mut level: Vec<[u8; 32]>) -> Vec<[u8; 32]> {
-        // If the number of leafs is odd, duplicate the last leaf.
-        if level.len() % 2 == 1 {
-            level.extend(level.last().cloned())
+    fn merkle_parent_level(level: &Vec<Hash>) -> Option<Vec<Hash>> {
+        // Is root, return None.
+        if level.len() == 1 {
+            return None;
         }
 
-        level.chunks_exact(2).map(Self::merkle_parent).collect()
+        // If the number of leafs is odd, duplicate the last leaf.
+        let mut parent_level = level.clone();
+
+        if level.len() % 2 == 1 {
+            parent_level.extend(parent_level.last().cloned())
+        }
+
+        Some(
+            parent_level
+                .chunks_exact(2)
+                .map(Self::merkle_parent)
+                .collect(),
+        )
     }
 
     /// Computes the Merkle root hash for the provided leaf hashes.
-    fn merkle_root(leafs: Vec<[u8; 32]>) -> [u8; 32] {
-        let mut level = leafs;
-
-        while level.len() > 1 {
-            level = Self::merkle_parent_level(level);
-        }
-
-        level[0]
+    pub fn root(&self) -> Hash {
+        self.levels.last().unwrap().first().unwrap().clone()
     }
 
     /// Hash the provided bytes using SHA-256.
     /// Returns the hash as a 32 bytes array.
-    fn hash(bytes: &[u8]) -> [u8; 32] {
-        Hash::hash(bytes)
+    fn hash(bytes: &[u8]) -> Hash {
+        hmac_sha256::Hash::hash(bytes)
+    }
+
+    // Returns tuple (level, index, hash).
+    fn get_parent(&self, level: usize, index: usize) -> Option<TreePosition> {
+        let parent_index = index / 2;
+        let parent_level = level + 1;
+        let parent = self.levels.get(parent_level)?.get(parent_index)?.clone();
+
+        Some(TreePosition {
+            level: parent_level,
+            index: parent_index,
+            hash: parent,
+        })
+    }
+
+    fn get_sibling(&self, level: usize, index: usize) -> Option<TreePosition> {
+        let sibling_index = if index % 2 == 1 { index - 1 } else { index + 1 };
+
+        let sibling = self.levels.get(level)?.get(sibling_index)?.clone();
+
+        Some(TreePosition {
+            level: level,
+            index: sibling_index,
+            hash: sibling,
+        })
+    }
+
+    pub fn proof_of_inclusion(&self, hash: &Hash) -> Option<Vec<Hash>> {
+        let index = self.levels.get(0)?.iter().position(|&h| h == *hash)?;
+
+        let mut current = TreePosition {
+            level: 0,
+            index,
+            hash: hash.clone(),
+        };
+
+        let mut proof: Vec<Hash> = Vec::new();
+
+        while let Some(parent) = self.get_parent(current.level, current.index) {
+            let sibling = self.get_sibling(current.level, current.index);
+            proof.push(sibling.or(Some(current)).unwrap().hash);
+            current = parent;
+        }
+
+        Some(proof)
+    }
+
+    pub fn validate_proof(&self, hash: &Hash, proof: &[Hash]) -> bool {
+        let validation_root = proof.iter().fold(hash.clone(), |hash, sibling| {
+            Self::merkle_parent(&[hash, *sibling])
+        });
+
+        validation_root == self.root()
+    }
+
+    pub fn contains_hash(&self, hash: &Hash) -> bool {
+        self.levels[0].iter().any(|h| h == hash)
     }
 }
 
@@ -63,8 +145,8 @@ mod tests {
 
     #[test]
     fn test_hash_should_return_sha256_digest() {
-        let input = "In a hole in the ground there lived a hobbit.".as_bytes();
-        let hash = MerkleTree::hash(input);
+        let input = "In a hole in the ground there lived a hobbit.";
+        let hash = MerkleTree::hash(input.as_bytes());
 
         assert_eq!(
             hash.to_vec(),
@@ -75,16 +157,16 @@ mod tests {
 
     #[test]
     fn test_merkle_parent_should_return_hash_of_concated_hashes() {
-        let left_input = "In a hole in the ground ".as_bytes();
-        let left_hash = MerkleTree::hash(left_input);
+        let left_input = "In a hole in the ground ";
+        let left_hash = MerkleTree::hash(left_input.as_bytes());
         assert_eq!(
             left_hash.to_vec(),
             hex::decode("0e692eea8afb6955c357130611417c8426b87c5210c6b5206d0caf60a3f069f9")
                 .unwrap()
         );
 
-        let right_input = "there lived a hobbit.".as_bytes();
-        let right_hash = MerkleTree::hash(right_input);
+        let right_input = "there lived a hobbit.";
+        let right_hash = MerkleTree::hash(right_input.as_bytes());
         assert_eq!(
             right_hash.to_vec(),
             hex::decode("fd6914578ce0a0ac2eb1f679a3a8047878c728d6518f48a3f0eb18ee57cc5091")
@@ -108,15 +190,16 @@ mod tests {
             MerkleTree::hash("until the stars are all alight.".as_bytes()),
         ];
 
-        let parent_level = MerkleTree::merkle_parent_level(hashes.clone());
+        let parent_level = MerkleTree::merkle_parent_level(&hashes);
 
-        assert_eq!(parent_level.len(), 2);
+        assert!(parent_level.is_some());
+        assert_eq!(parent_level.clone().unwrap().len(), 2);
         assert_eq!(
-            parent_level[0].to_vec(),
+            parent_level.clone().unwrap()[0].to_vec(),
             MerkleTree::merkle_parent(&[hashes[0], hashes[1]]).to_vec()
         );
         assert_eq!(
-            parent_level[1].to_vec(),
+            parent_level.clone().unwrap()[1].to_vec(),
             MerkleTree::merkle_parent(&[hashes[2], hashes[3]]).to_vec()
         );
     }
@@ -131,46 +214,55 @@ mod tests {
             MerkleTree::hash("In the Land of Mordor where the Shadows lie.".as_bytes()),
         ];
 
-        let parent_level = MerkleTree::merkle_parent_level(hashes.clone());
+        let parent_level = MerkleTree::merkle_parent_level(&hashes);
 
-        assert_eq!(parent_level.len(), 3);
+        assert_eq!(parent_level.clone().unwrap().len(), 3);
         assert_eq!(
-            parent_level[0].to_vec(),
+            parent_level.clone().unwrap()[0].to_vec(),
             MerkleTree::merkle_parent(&[hashes[0], hashes[1]]).to_vec()
         );
         assert_eq!(
-            parent_level[1].to_vec(),
+            parent_level.clone().unwrap()[1].to_vec(),
             MerkleTree::merkle_parent(&[hashes[2], hashes[3]]).to_vec()
         );
         assert_eq!(
-            parent_level[2].to_vec(),
+            parent_level.clone().unwrap()[2].to_vec(),
             MerkleTree::merkle_parent(&[hashes[4], hashes[4]]).to_vec()
         );
     }
 
     #[test]
     fn test_merkle_root_should_return_root_hash_one_level() {
-        let hashes = vec![
-            MerkleTree::hash("The Road goes ever on and on,".as_bytes()),
-            MerkleTree::hash("Down from the door where it began.".as_bytes()),
+        let items = vec![
+            "The Road goes ever on and on,",
+            "Down from the door where it began.",
         ];
 
-        let root_hash = MerkleTree::merkle_root(hashes.clone());
+        let hashes = vec![
+            MerkleTree::hash(items[0].as_bytes()),
+            MerkleTree::hash(items[1].as_bytes()),
+        ];
+
+        let root_hash = MerkleTree::build(&items).unwrap().root();
 
         assert_eq!(root_hash.to_vec(), MerkleTree::merkle_parent(&hashes));
     }
 
     #[test]
     fn test_merkle_root_should_return_root_hash_two_levels() {
-        let hashes = vec![
-            MerkleTree::hash("One Ring to rule them all, One Ring to find them,".as_bytes()),
-            MerkleTree::hash(
-                "One Ring to bring them all and in the darkness bind them.".as_bytes(),
-            ),
-            MerkleTree::hash("In the Land of Mordor where the Shadows lie.".as_bytes()),
+        let items = vec![
+            "One Ring to rule them all, One Ring to find them,",
+            "One Ring to bring them all and in the darkness bind them.",
+            "In the Land of Mordor where the Shadows lie.",
         ];
 
-        let root_hash = MerkleTree::merkle_root(hashes.clone());
+        let hashes = vec![
+            MerkleTree::hash(items[0].as_bytes()),
+            MerkleTree::hash(items[1].as_bytes()),
+            MerkleTree::hash(items[2].as_bytes()),
+        ];
+
+        let root_hash = MerkleTree::build(&items).unwrap().root();
 
         assert_eq!(
             root_hash.to_vec(),
@@ -182,8 +274,168 @@ mod tests {
     }
 
     #[test]
+    fn test_build_merkle_tree() {
+        let items = vec![
+            "One Ring to rule them all,",
+            "One Ring to find them,",
+            "One Ring to bring them all",
+            "and in the darkness bind them.",
+            "In the Land of Mordor where the Shadows lie.",
+        ];
+
+        let hashes = vec![
+            MerkleTree::hash(items[0].as_bytes()),
+            MerkleTree::hash(items[1].as_bytes()),
+            MerkleTree::hash(items[2].as_bytes()),
+            MerkleTree::hash(items[3].as_bytes()),
+            MerkleTree::hash(items[4].as_bytes()),
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        assert_eq!(tree.levels.len(), 4);
+        // Check length of each level.
+        assert_eq!(tree.levels[0].len(), 5);
+        assert_eq!(tree.levels[1].len(), 3);
+        assert_eq!(tree.levels[2].len(), 2);
+        assert_eq!(tree.levels[3].len(), 1);
+
+        assert_eq!(tree.levels[0], hashes);
+        assert_eq!(
+            tree.levels[1],
+            MerkleTree::merkle_parent_level(&hashes).unwrap()
+        );
+        assert_eq!(
+            tree.levels[2],
+            MerkleTree::merkle_parent_level(&tree.levels[1]).unwrap()
+        );
+        assert_eq!(
+            tree.levels[3],
+            MerkleTree::merkle_parent_level(&tree.levels[2]).unwrap()
+        );
+        assert_eq!(tree.root().to_vec(), tree.levels[3][0].to_vec());
+    }
+
+    #[test]
     fn test_build_with_no_items_returns_none() {
         let tree = MerkleTree::build(Vec::<&[u8]>::new().as_slice());
         assert!(tree.is_none());
+    }
+
+    #[test]
+    fn test_proof_of_inclusion_non_existant_hash() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let non_existant_hash = MerkleTree::hash("Fly, you fools!".as_bytes());
+
+        let proof = tree.proof_of_inclusion(&non_existant_hash);
+
+        assert!(proof.is_none());
+    }
+
+    #[test]
+    fn test_proof_of_inclusion() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[2].as_bytes());
+
+        let proof = tree.proof_of_inclusion(&hash).unwrap();
+
+        assert_eq!(proof.len(), 3);
+        assert_eq!(proof[0].to_vec(), tree.levels[0][3].to_vec());
+        assert_eq!(proof[1].to_vec(), tree.levels[1][0].to_vec());
+        assert_eq!(proof[2].to_vec(), tree.levels[2][1].to_vec());
+    }
+
+    #[test]
+    fn test_validate_wrong_proof() {
+        let corrupted_items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "LONG LIVE SAURON ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let corrupt_tree = MerkleTree::build(&corrupted_items).unwrap();
+        let corrupt_element_hash = corrupt_tree.levels[0][2];
+        let wrong_proof = corrupt_tree
+            .proof_of_inclusion(&corrupt_element_hash)
+            .unwrap();
+
+        let correct_items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let correct_tree = MerkleTree::build(&correct_items).unwrap();
+
+        assert!(!correct_tree.validate_proof(&corrupt_element_hash, &wrong_proof));
+    }
+
+    #[test]
+    fn test_validate_correct_proof() {
+        let items = vec![
+            "and so do all who live to see such times. ",
+            "But that is not for them to decide. ",
+            "All we have to decide ",
+            "is what to do with the time ",
+            "that is given us.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[2].as_bytes());
+
+        let proof = tree.proof_of_inclusion(&hash).unwrap();
+
+        assert!(tree.validate_proof(&hash, &proof));
+    }
+
+    #[test]
+    fn test_hash_not_included_returns_false() {
+        let items = vec![
+            "Home is behind, the world ahead, ",
+            "and there are many paths to tread.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash("Fly, you fools!".as_bytes());
+
+        assert!(!tree.contains_hash(&hash));
+    }
+
+    #[test]
+    fn test_hash_included_returns_true() {
+        let items = vec![
+            "Home is behind, the world ahead, ",
+            "and there are many paths to tread.",
+        ];
+
+        let tree = MerkleTree::build(&items).unwrap();
+
+        let hash = MerkleTree::hash(items[1].as_bytes());
+
+        assert!(tree.contains_hash(&hash));
     }
 }
