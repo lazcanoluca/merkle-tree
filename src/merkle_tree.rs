@@ -92,7 +92,7 @@ impl MerkleTree {
 
     /// Hash the provided bytes using SHA-256.
     /// Returns the hash as a 32 bytes array.
-    fn hash(bytes: &[u8]) -> Hash {
+    pub fn hash(bytes: &[u8]) -> Hash {
         hmac_sha256::Hash::hash(bytes)
     }
 
