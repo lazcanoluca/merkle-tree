@@ -15,7 +15,7 @@ pub struct MerkleTree {
 impl MerkleTree {
     /// Create a new MerkleTree from the provided items.
     /// Each item should be representable as bytes.
-    /// It returns a `MerkleTree` instance with the leaf hashes and the Merkle root.
+    /// It returns a `MerkleTree` instance.
     pub fn build<T: AsRef<[u8]>>(items: &[T]) -> Option<Self> {
         if items.is_empty() {
             return None;
