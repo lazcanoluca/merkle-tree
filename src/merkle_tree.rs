@@ -105,8 +105,8 @@ impl MerkleTree {
     }
 
     /// Computes the Merkle root hash for the provided leaf hashes.
-    pub fn root(&self) -> Hash {
-        self.levels.last().unwrap().first().unwrap().clone()
+    pub fn root(&self) -> Option<Hash> {
+        Some(self.levels.last().unwrap().first().unwrap().clone())
     }
 
     /// Hash the provided bytes using SHA-256.
@@ -173,7 +173,7 @@ impl MerkleTree {
             Self::merkle_parent(&[hash, *sibling])
         });
 
-        validation_root == self.root()
+        validation_root == self.root().expect("The tree has no root.")
     }
 
     pub fn contains_hash(&self, hash: &Hash) -> bool {
@@ -288,7 +288,10 @@ mod tests {
 
         let root_hash = MerkleTree::build(&items).unwrap().root();
 
-        assert_eq!(root_hash.to_vec(), MerkleTree::merkle_parent(&hashes));
+        assert_eq!(
+            root_hash.unwrap().to_vec(),
+            MerkleTree::merkle_parent(&hashes)
+        );
     }
 
     #[test]
@@ -308,7 +311,7 @@ mod tests {
         let root_hash = MerkleTree::build(&items).unwrap().root();
 
         assert_eq!(
-            root_hash.to_vec(),
+            root_hash.unwrap().to_vec(),
             MerkleTree::merkle_parent(&[
                 MerkleTree::merkle_parent(&[hashes[0], hashes[1]]),
                 MerkleTree::merkle_parent(&[hashes[2], hashes[2]])
@@ -356,7 +359,7 @@ mod tests {
             tree.levels[3],
             MerkleTree::merkle_parent_level(&tree.levels[2]).unwrap()
         );
-        assert_eq!(tree.root().to_vec(), tree.levels[3][0].to_vec());
+        assert_eq!(tree.root().unwrap().to_vec(), tree.levels[3][0].to_vec());
     }
 
     #[test]
