@@ -190,38 +190,38 @@ mod tests {
     fn test_hash_should_return_sha256_digest() {
         let input = "In a hole in the ground there lived a hobbit.";
         let hash = MerkleTree::hash(input.as_bytes());
-
-        assert_eq!(
-            hash.to_vec(),
+        let expected_hash =
             hex::decode("38a76005681abd4a4f50a364d472016436f17e79778577ee5825580f06997202")
-                .unwrap()
-        );
+                .unwrap();
+
+        assert_eq!(hash.to_vec(), expected_hash);
     }
 
     #[test]
     fn test_merkle_parent_should_return_hash_of_concated_hashes() {
         let left_input = "In a hole in the ground ";
         let left_hash = MerkleTree::hash(left_input.as_bytes());
-        assert_eq!(
-            left_hash.to_vec(),
+
+        let expected_left_hash =
             hex::decode("0e692eea8afb6955c357130611417c8426b87c5210c6b5206d0caf60a3f069f9")
-                .unwrap()
-        );
+                .unwrap();
+
+        assert_eq!(left_hash.to_vec(), expected_left_hash);
 
         let right_input = "there lived a hobbit.";
         let right_hash = MerkleTree::hash(right_input.as_bytes());
-        assert_eq!(
-            right_hash.to_vec(),
+        let expected_right_hash =
             hex::decode("fd6914578ce0a0ac2eb1f679a3a8047878c728d6518f48a3f0eb18ee57cc5091")
-                .unwrap()
-        );
+                .unwrap();
+
+        assert_eq!(right_hash.to_vec(), expected_right_hash);
 
         let parent_hash = MerkleTree::merkle_parent(&[left_hash, right_hash]);
-        assert_eq!(
-            parent_hash.to_vec(),
+        let expected_parent_hash =
             hex::decode("e7dbb63c6671bdf7581e418da8feee175e86adc84adc8e123a30407dd8e730f3")
-                .unwrap()
-        );
+                .unwrap();
+
+        assert_eq!(parent_hash.to_vec(), expected_parent_hash);
     }
 
     #[test]
