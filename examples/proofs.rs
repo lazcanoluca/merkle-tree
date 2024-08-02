@@ -1,49 +1,3 @@
-# Merkle Tree
-
-This project is a Rust implementation of a Merkle Tree.
-
-## Usage
-
-To use this crate, include it as a dependency in your `Cargo.toml` file.
-
-```toml
-[dependencies]
-merkle-tree = { git = "https://github.com/lazcanoluca/merkle-tree.git" }
-```
-
-Then, import and use:
-
-### Creation and insertion of elements
-
-```rust
-use merkle_tree::MerkleTree;
-
-fn main() {
-    // Create a new Merkle tree from a list of items.
-    let items = vec!["In a hole in the ground", "there lived a hobbit."];
-
-    let mut merkle_tree = MerkleTree::build(&items).unwrap();
-
-    // Get the root hash of the Merkle tree.
-    let root = merkle_tree.root();
-
-    println!("Root: {:?}", root);
-
-    // Add an item to the Merkle tree.
-    let new_item = "The quick brown fox jumps over the lazy dog.";
-
-    merkle_tree.insert(&new_item);
-
-    // Get the new root hash of the Merkle tree.
-    let new_root = merkle_tree.root();
-
-    println!("New root: {:?}", new_root);
-}
-```
-
-### Creation and verification of proofs
-
-```rust
 use merkle_tree::MerkleTree;
 
 fn main() {
@@ -88,21 +42,3 @@ fn main() {
     // Verify the good proof is valid.
     assert!(merkle_tree.validate_proof(&good_hash, &good_proof));
 }
-```
-
-
-## Tests
-
-Just clone and `cargo test`.
-
-## Features
-
-- [x] A Merkle Tree can be built out of an array.
-
-- [x] A Merkle Tree can generate a proof that it contains an element.
-
-- [x] A Merkle Tree can validate that the proof for a given hash is correct.
-
-- [x] A Merkle Tree can verify that a given hash is contained in it.
-
-- [x] A Merke Tree can be dynamic, this means that elements can be added once it is built.
