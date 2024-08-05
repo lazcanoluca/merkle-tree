@@ -514,6 +514,9 @@ mod tests {
 
         let tree_complete = MerkleTree::build(&items_complete).unwrap();
 
-        assert_eq!(tree.root().to_vec(), tree_complete.root().to_vec());
+        assert_eq!(
+            tree.root().unwrap().to_vec(),
+            tree_complete.root().unwrap().to_vec()
+        );
     }
 }
